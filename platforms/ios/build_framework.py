@@ -165,7 +165,10 @@ class Builder:
                 "ARCHS=%s" % arch,
             ]
 
-        buildcmd += [
+            if not self.bitcodedisabled:
+                buildcmd.append("BITCODE_GENERATION_MODE=bitcode")
+
+            buildcmd += [
                 "-sdk", target.lower(),
                 "-configuration", "Release",
                 "-parallelizeTargets",
