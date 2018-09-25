@@ -128,6 +128,11 @@ class Builder:
             "-DAPPLE_FRAMEWORK=ON",
             "-DCMAKE_INSTALL_PREFIX=install",
             "-DCMAKE_BUILD_TYPE=Release",
+            "-DWITH_PROTOBUF=NO",
+            "-DWITH_IMGCODEC_HDR=NO",
+            "-DWITH_IMGCODEC_SUNRASTER=NO",
+            "-DWITH_IMGCODEC_PXM=NO",
+            "-DWITH_WEBP=NO",
         ] + ([
             "-DBUILD_SHARED_LIBS=ON",
             "-DCMAKE_MACOSX_BUNDLE=ON",
