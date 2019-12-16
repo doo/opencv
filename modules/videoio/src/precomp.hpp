@@ -102,6 +102,7 @@ struct CvVideoWriter
 {
     virtual ~CvVideoWriter() {}
     virtual bool writeFrame(const IplImage*) { return false; }
+    virtual int getCaptureDomain() const { return cv::CAP_ANY; } // Return the type of the capture object: CAP_FFMPEG, etc...
 };
 
 CvCapture * cvCreateCameraCapture_V4L( int index );
@@ -129,8 +130,10 @@ CvCapture* cvCreateCameraCapture_XIMEA( const char* serialNumber );
 CvCapture* cvCreateCameraCapture_AVFoundation(int index);
 CvCapture* cvCreateCameraCapture_Aravis( int index );
 
+namespace cv {
 CvCapture* cvCreateFileCapture_Images(const char* filename);
 CvVideoWriter* cvCreateVideoWriter_Images(const char* filename);
+}
 
 
 #define CV_CAP_GSTREAMER_1394		0
@@ -151,8 +154,11 @@ CvVideoWriter* cvCreateVideoWriter_AVFoundation( const char* filename, int fourc
 
 CvCapture * cvCreateCameraCapture_Unicap  (const int     index);
 CvCapture * cvCreateCameraCapture_PvAPI  (const int     index);
+
+namespace cv {
 CvVideoWriter* cvCreateVideoWriter_GStreamer( const char* filename, int fourcc,
                                             double fps, CvSize frameSize, int is_color );
+}
 
 
 namespace cv
@@ -178,6 +184,8 @@ namespace cv
 
         virtual bool isOpened() const = 0;
         virtual void write(InputArray) = 0;
+
+        virtual int getCaptureDomain() const { return cv::CAP_ANY; } // Return the type of the capture object: CAP_FFMPEG, etc...
     };
 
     Ptr<IVideoCapture> createMotionJpegCapture(const String& filename);

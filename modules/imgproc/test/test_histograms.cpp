@@ -1307,9 +1307,18 @@ cvTsCalcHist( const vector<Mat>& images, CvHistogram* hist, Mat mask, const vect
                 for( k = 0; k < cdims; k++ )
                 {
                     double v = val[k], lo = hist->thresh[k][0], hi = hist->thresh[k][1];
-                    idx[k] = cvFloor((v - lo)*dims[k]/(hi - lo));
-                    if( idx[k] < 0 || idx[k] >= dims[k] )
+                    if (v < lo || v >= hi)
                         break;
+                    double idx_ = (v - lo)*dims[k]/(hi - lo);
+                    idx[k] = cvFloor(idx_);
+                    if (idx[k] < 0)
+                    {
+                        idx[k] = 0;
+                    }
+                    if (idx[k] >= dims[k])
+                    {
+                        idx[k] = dims[k] - 1;
+                    }
                 }
             }
             else
@@ -1729,15 +1738,15 @@ int CV_CalcBackProjectPatchTest::prepare_test_case( int test_case_idx )
 
 void CV_CalcBackProjectPatchTest::run_func(void)
 {
-    CvMat dst(images[CV_MAX_DIM]);
+    CvMat dst = cvMat(images[CV_MAX_DIM]);
     vector<CvMat >  img(cdims);
     vector<CvMat*> pimg(cdims);
     for(int i = 0; i < cdims; i++)
     {
-        img[i] = CvMat(images[i]);
+        img[i] = cvMat(images[i]);
         pimg[i] = &img[i];
     }
-    cvCalcArrBackProjectPatch( (CvArr**)&pimg[0], &dst, patch_size, hist[0], method, factor );
+    cvCalcArrBackProjectPatch( (CvArr**)&pimg[0], &dst, cvSize(patch_size), hist[0], method, factor );
 }
 
 
