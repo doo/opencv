@@ -40,16 +40,18 @@ public:
         return true;
     }
 
-    virtual void finalize(const std::vector<Mat*> &inputs, std::vector<Mat> &outputs) CV_OVERRIDE
+    virtual void finalize(InputArrayOfArrays inputs_arr, OutputArrayOfArrays) CV_OVERRIDE
     {
+        std::vector<Mat> inputs;
+        inputs_arr.getMatVector(inputs);
         hasWeights = blobs.size() == 2 || (blobs.size() == 1 && !hasBias);
-        CV_Assert(inputs.size() == 2 && blobs.empty() || blobs.size() == (int)hasWeights + (int)hasBias);
+        CV_Assert((inputs.size() == 2 && blobs.empty()) || blobs.size() == (int)hasWeights + (int)hasBias);
     }
 
     virtual bool supportBackend(int backendId) CV_OVERRIDE
     {
         return backendId == DNN_BACKEND_OPENCV || backendId == DNN_BACKEND_HALIDE ||
-               backendId == DNN_BACKEND_INFERENCE_ENGINE && axis == 1;
+               (backendId == DNN_BACKEND_INFERENCE_ENGINE && axis == 1);
     }
 
     void forward(InputArrayOfArrays inputs_arr, OutputArrayOfArrays outputs_arr, OutputArrayOfArrays internals_arr) CV_OVERRIDE
@@ -57,20 +59,23 @@ public:
         CV_TRACE_FUNCTION();
         CV_TRACE_ARG_VALUE(name, "name", name.c_str());
 
-        Layer::forward_fallback(inputs_arr, outputs_arr, internals_arr);
-    }
+        if (inputs_arr.depth() == CV_16S)
+        {
+            forward_fallback(inputs_arr, outputs_arr, internals_arr);
+            return;
+        }
 
-    void forward(std::vector<Mat*> &inputs, std::vector<Mat> &outputs, std::vector<Mat> &internals) CV_OVERRIDE
-    {
-        CV_TRACE_FUNCTION();
-        CV_TRACE_ARG_VALUE(name, "name", name.c_str());
+        std::vector<Mat> inputs, outputs;
+        inputs_arr.getMatVector(inputs);
+        outputs_arr.getMatVector(outputs);
+
         CV_Assert_N(outputs.size() == 1, !blobs.empty() || inputs.size() == 2);
 
-        Mat &inpBlob = *inputs[0];
+        Mat &inpBlob = inputs[0];
         Mat &outBlob = outputs[0];
         // There is a mode when we multiply a first blob by a second one
         // instead of trainable weights.
-        Mat weights = blobs.empty() ? *inputs[1] : (hasWeights ? blobs[0] : Mat());
+        Mat weights = blobs.empty() ? inputs[1] : (hasWeights ? blobs[0] : Mat());
         Mat bias = hasBias ? blobs.back().reshape(1, 1) : Mat();
         if (!weights.empty())
             weights = weights.reshape(1, 1);
@@ -189,38 +194,33 @@ public:
     }
 #endif  // HAVE_HALIDE
 
+#ifdef HAVE_INF_ENGINE
     virtual Ptr<BackendNode> initInfEngine(const std::vector<Ptr<BackendWrapper> >&) CV_OVERRIDE
     {
-#ifdef HAVE_INF_ENGINE
-        InferenceEngine::LayerParams lp;
-        lp.name = name;
-        lp.type = "ScaleShift";
-        lp.precision = InferenceEngine::Precision::FP32;
-        std::shared_ptr<InferenceEngine::ScaleShiftLayer> ieLayer(new InferenceEngine::ScaleShiftLayer(lp));
+        InferenceEngine::Builder::Layer l = InferenceEngine::Builder::ScaleShiftLayer(name);
 
         CV_Assert(!blobs.empty());
         const size_t numChannels = blobs[0].total();
         if (hasWeights)
         {
-            ieLayer->_weights = wrapToInfEngineBlob(blobs[0], {numChannels}, InferenceEngine::Layout::C);
+            addConstantData("weights", wrapToInfEngineBlob(blobs[0], {numChannels}, InferenceEngine::Layout::C), l);
         }
         else
         {
-            auto weights = InferenceEngine::make_shared_blob<float>(InferenceEngine::Precision::FP32,
-                                                                    {numChannels});
+            auto weights = InferenceEngine::make_shared_blob<float>({
+                               InferenceEngine::Precision::FP32, {(size_t)numChannels},
+                               InferenceEngine::Layout::C
+                           });
             weights->allocate();
-
-            std::vector<float> ones(numChannels, 1);
-            weights->set(ones);
-            ieLayer->_weights = weights;
+            float* buf = weights->buffer().as<float*>();
+            std::fill(buf, buf + numChannels, 1);
+            addConstantData("weights", weights, l);
         }
         if (hasBias)
-            ieLayer->_biases = wrapToInfEngineBlob(blobs.back(), {numChannels}, InferenceEngine::Layout::C);
-
-        return Ptr<BackendNode>(new InfEngineBackendNode(ieLayer));
-#endif  // HAVE_INF_ENGINE
-        return Ptr<BackendNode>();
+            addConstantData("biases", wrapToInfEngineBlob(blobs.back(), {numChannels}, InferenceEngine::Layout::C), l);
+        return Ptr<BackendNode>(new InfEngineBackendNode(l));
     }
+#endif  // HAVE_INF_ENGINE
 
     void getScaleShift(Mat& scale, Mat& shift) const CV_OVERRIDE
     {
@@ -231,7 +231,7 @@ public:
     virtual int64 getFLOPS(const std::vector<MatShape> &inputs,
                            const std::vector<MatShape> &outputs) const CV_OVERRIDE
     {
-        (void)outputs; // suppress unused variable warning
+        CV_UNUSED(outputs); // suppress unused variable warning
         long flops = 0;
         for(int i = 0; i < inputs.size(); i++)
         {

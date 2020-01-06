@@ -169,6 +169,10 @@ enum VideoCaptureProperties {
        CAP_PROP_AUTOFOCUS     =39,
        CAP_PROP_SAR_NUM       =40, //!< Sample aspect ratio: num/den (num)
        CAP_PROP_SAR_DEN       =41, //!< Sample aspect ratio: num/den (den)
+       CAP_PROP_BACKEND       =42, //!< Current backend (enum VideoCaptureAPIs). Read-only property
+       CAP_PROP_CHANNEL       =43, //!< Video input or Channel Number (only for those cameras that support)
+       CAP_PROP_AUTO_WB       =44, //!< enable/ disable auto white-balance
+       CAP_PROP_WB_TEMPERATURE=45, //!< white-balance color temperature
 #ifndef CV_DOXYGEN
        CV__CAP_PROP_LATEST
 #endif
@@ -648,6 +652,18 @@ public:
     */
     CV_WRAP VideoCapture(int index);
 
+    /** @overload
+    @brief  Opens a camera for video capturing
+
+    @param index id of the video capturing device to open. To open default camera using default backend just pass 0.
+    (to backward compatibility usage of camera_id + domain_offset (CAP_*) is valid when apiPreference is CAP_ANY)
+    @param apiPreference preferred Capture API backends to use. Can be used to enforce a specific reader
+    implementation if multiple are available: e.g. cv::CAP_DSHOW or cv::CAP_MSMF or cv::CAP_V4L2.
+
+    @sa The list of supported API backends cv::VideoCaptureAPIs
+    */
+    CV_WRAP VideoCapture(int index, int apiPreference);
+
     /** @brief Default destructor
 
     The method first calls VideoCapture::release to close the already opened file or camera.
@@ -737,7 +753,7 @@ public:
 
     @note In @ref videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
-    :ocvcvCloneImage and then do whatever you want with the copy.
+    cvCloneImage and then do whatever you want with the copy.
      */
     CV_WRAP virtual bool retrieve(OutputArray image, int flag = 0);
 
@@ -763,7 +779,7 @@ public:
 
     @note In @ref videoio_c "C API", functions cvRetrieveFrame() and cv.RetrieveFrame() return image stored inside the video
     capturing structure. It is not allowed to modify or release the image! You can copy the frame using
-    :ocvcvCloneImage and then do whatever you want with the copy.
+    cvCloneImage and then do whatever you want with the copy.
      */
     CV_WRAP virtual bool read(OutputArray image);
 
@@ -787,8 +803,8 @@ public:
 
     @note Reading / writing properties involves many layers. Some unexpected result might happens
     along this chain.
-    @code {.txt}
-    `VideoCapture -> API Backend -> Operating System -> Device Driver -> Device Hardware`
+    @code{.txt}
+    VideoCapture -> API Backend -> Operating System -> Device Driver -> Device Hardware
     @endcode
     The returned value might be different from what really used by the device or it could be encoded
     using device dependent rules (eg. steps or percentage). Effective behaviour depends from device
@@ -807,6 +823,12 @@ public:
     The method first calls VideoCapture::release to close the already opened file or camera.
     */
     CV_WRAP virtual bool open(const String& filename, int apiPreference);
+
+    /** @brief Returns used backend API name
+
+     @note Stream should be opened.
+     */
+    CV_WRAP String getBackendName() const;
 
 protected:
     Ptr<CvCapture> cap;
@@ -945,6 +967,12 @@ public:
     VideoWriter::VideoWriter or VideoWriter::open.
      */
     CV_WRAP static int fourcc(char c1, char c2, char c3, char c4);
+
+    /** @brief Returns used backend API name
+
+     @note Stream should be opened.
+     */
+    CV_WRAP String getBackendName() const;
 
 protected:
     Ptr<CvVideoWriter> writer;

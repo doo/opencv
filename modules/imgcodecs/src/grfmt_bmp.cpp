@@ -89,7 +89,7 @@ bool  BmpDecoder::readHeader()
     else if( !m_strm.open( m_filename ))
         return false;
 
-    CV_TRY
+    try
     {
         m_strm.skip( 10 );
         m_offset = m_strm.getDWord();
@@ -173,9 +173,9 @@ bool  BmpDecoder::readHeader()
             }
         }
     }
-    CV_CATCH_ALL
+    catch(...)
     {
-        CV_RETHROW();
+        throw;
     }
     // in 32 bit case alpha channel is used - so require CV_8UC4 type
     m_type = iscolor ? (m_bpp == 32 ? CV_8UC4 : CV_8UC3 ) : CV_8UC1;
@@ -203,6 +203,9 @@ bool  BmpDecoder::readData( Mat& img )
     int  nch = color ? 3 : 1;
     int  y, width3 = m_width*nch;
 
+    // FIXIT: use safe pointer arithmetic (avoid 'int'), use size_t, intptr_t, etc
+    CV_Assert(((uint64)m_height * m_width * nch < (CV_BIG_UINT(1) << 30)) && "BMP reader implementation doesn't support large images >= 1Gb");
+
     if( m_offset < 0 || !m_strm.isOpened())
         return false;
 
@@ -225,7 +228,7 @@ bool  BmpDecoder::readData( Mat& img )
     }
     uchar *src = _src.data(), *bgr = _bgr.data();
 
-    CV_TRY
+    try
     {
         m_strm.setPos( m_offset );
 
@@ -490,9 +493,9 @@ decode_rle8_bad: ;
             CV_Error(cv::Error::StsError, "Invalid/unsupported mode");
         }
     }
-    CV_CATCH_ALL
+    catch(...)
     {
-        CV_RETHROW();
+        throw;
     }
 
     return result;
