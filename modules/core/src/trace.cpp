@@ -88,6 +88,12 @@ static bool param_synchronizeOpenCL = utils::getConfigurationParameterBool("OPEN
 static bool param_ITT_registerParentScope = utils::getConfigurationParameterBool("OPENCV_TRACE_ITT_PARENT", false);
 #endif
 
+#ifdef OPENCV_WITH_ITT
+#warning "Building OpenCV with ITT support"
+#else
+#warning "Building OpenCV without ITT support"
+#endif
+
 static const char* _spaces(int count)
 {
     static const char buf[64] =
